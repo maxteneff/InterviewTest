@@ -11,8 +11,6 @@ uris=["/handle-bars", "/stems", "/wheelsets", "/forks", "/seatposts", "/saddles"
 codes = [100, 101, 102, 200, 201, 202, 300, 301, 302, 400, 404, 500, 502]
 otime = datetime.datetime(2013, 10, 10)
 
-sock = socket.socket()
-sock.connect(('localhost', 9999))
 while True:
 	increment = datetime.timedelta(seconds=random.randint(30, 300))
 	otime += increment
@@ -23,6 +21,4 @@ while True:
 	timestamp = otime.strftime('%Y-%m-%dT%H:%M:%S.000')
 	str = '%s %s %s "%s" %s' % (host, ip, timestamp, uri, code)
 	print (str)
-	sock.send(str)
 	time.sleep (1)
-sock.close()
