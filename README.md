@@ -10,7 +10,7 @@ cd InterviewTest && sbt package
 ```
 ### 3. Run: 
 ```
-spark-submit --master local[2] ./interviewtest_2.11-1.0.jar localhost 9999 file:/tmp output.txt
+spark-submit --master local[2] interviewtest_2.11-1.0.jar localhost 9999 file:/tmp output.txt
 ```
 ### 4. Look for output file: 
 ```
