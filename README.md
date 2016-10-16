@@ -1,6 +1,6 @@
 # InterviewTest
 
-## How to use:
+## Usage:
 ```
 ServerLogsStreaming <hostname> <port> <checkpoint-directory> <output-file>. 
      <hostname> and <port> describe the TCP server that Spark Streaming would connect to receive data. 
@@ -27,4 +27,9 @@ spark-submit --master local[2] interviewtest_2.11-1.0.jar localhost 9999 file:/t
 #### 4. Look for output file: 
 ```
 tail -f output.txt
+```
+
+## Logs generator:
+```
+python logs_gen.py
 ```
