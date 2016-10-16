@@ -6,7 +6,7 @@ git clone https://github.com/maxteneff/InterviewTest.git
 ```
 ### 2. Build: 
 ```
-cd InterviewTest && sbt
+cd InterviewTest && sbt package
 ```
 ### 3. Run: 
 ```
