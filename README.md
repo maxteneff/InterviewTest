@@ -1,7 +1,7 @@
 # InterviewTest
 
 ## How to use:
-
+```
 ServerLogsStreaming <hostname> <port> <checkpoint-directory> <output-file>. 
      <hostname> and <port> describe the TCP server that Spark Streaming would connect to receive data. 
      <checkpoint-directory> directory to local (file:/) or HDFS-compatible (hdfs:/) file system.
@@ -9,7 +9,7 @@ ServerLogsStreaming <hostname> <port> <checkpoint-directory> <output-file>.
 
 In local mode, <master> should be 'local[n]' with n > 1
 Both <checkpoint-directory> and <output-file> must be absolute paths
-
+```
 ## How to run:
 
 #### 1. Download: 
