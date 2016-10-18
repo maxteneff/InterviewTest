@@ -8,6 +8,7 @@ import org.apache.spark.SparkConf
 import org.apache.spark.rdd.RDD
 import org.apache.spark.storage.StorageLevel
 import org.apache.spark.streaming._
+import org.apache.spark.streaming.dstream.DStream
 
 import scala.util.Try
 
@@ -16,7 +17,7 @@ case class LogRecord(host: String, source: String, timestamp: String, url: Strin
 object ServerLogsStreaming {
 
   def createOutputMessage(message: String) : String = {
-    val formatter = new SimpleDateFormat("dd/MM/yyyy hh:mm:ss");
+    val formatter = new SimpleDateFormat("dd/MM/yyyy HH:mm:ss");
     formatter.format(new Date()) ++ " INFO " ++ message ++ "\n";
   }
 
@@ -64,6 +65,35 @@ object ServerLogsStreaming {
     }
   }
 
+  def createRecordStream(logs: DStream[String]): DStream[LogRecord] = {
+    logs.flatMap(str => createLogRecord(str))
+  }
+
+  def createHost1mAvgStream(logParams: DStream[LogRecord]): DStream[(String, Double)] = {
+    val hostPairs = logParams.map(rec => (rec.host, 1))
+    val hostCounts = hostPairs.reduceByKeyAndWindow((a:Int,b:Int) => (a + b), Seconds(60), Seconds(10))
+    hostCounts.map(x => (x._1, x._2 / 60.0))
+  }
+
+  def createHost1mWrongCodeStream(logParams: DStream[LogRecord]): DStream[(String, Int)] = {
+    val codeFiltered = logParams.filter(rec => rec.code < 200 || rec.code >= 300)
+    val codePairs = codeFiltered.map(rec => (rec.host, 1))
+    val codeCounts = codePairs.reduceByKeyAndWindow((a:Int,b:Int) => (a + b), Seconds(60), Seconds(60))
+    codeCounts.filter(x => x._2 >= 2)
+  }
+
+  def createNewHostsStream(logParams: DStream[LogRecord]): DStream[(String, (Long, Boolean))] = {
+    val hostActivityNew = logParams.map(rec => (rec.host, System.currentTimeMillis))
+    val hostStateNew = hostActivityNew.updateStateByKey(updateStateNew)
+    hostStateNew.filter(rec => rec._2._2 == true)
+  }
+
+  def createLostHostsStream(logParams: DStream[LogRecord]): DStream[(String, Int)] = {
+    val hostActivityLost = logParams.map(rec => (rec.host, 1))
+    val hostStateLost = hostActivityLost.updateStateByKey(updateStateLost)
+    hostStateLost.filter(rec => rec._2 == 0)
+  }
+
   def main(args: Array[String]) {
     if (args.length != 4) {
       System.err.println("Your arguments were " + args.mkString("[", ", ", "]"))
@@ -89,14 +119,17 @@ object ServerLogsStreaming {
     val outputFile = new File(args(3))
 
     val logs = ssc.socketTextStream(args(0), args(1).toInt, StorageLevel.MEMORY_AND_DISK_SER)
-    val logParams = logs.flatMap(str => createLogRecord(str))
-    val hostPairs = logParams.map(rec => (rec.host, 1))
-    val codeFiltered = logParams.filter(rec => rec.code < 200 || rec.code >= 300)
-    val codePairs = codeFiltered.map(rec => (rec.host, 1))
-    val hostCounts = hostPairs.reduceByKeyAndWindow((a:Int,b:Int) => (a + b), Seconds(60), Seconds(10))
-    val codeCounts = codePairs.reduceByKeyAndWindow((a:Int,b:Int) => (a + b), Seconds(60), Seconds(60))
-    val host1mAvg = hostCounts.map(x => (x._1, x._2 / 60.0))
-    val host1mWrongCode = codeCounts.filter(x => x._2 >= 2)
+    val logParams = createRecordStream(logs)
+    val host1mAvg = createHost1mAvgStream(logParams)
+    val host1mWrongCode = createHost1mWrongCodeStream(logParams)
+
+    //val hostPairs = logParams.map(rec => (rec.host, 1))
+    //val codeFiltered = logParams.filter(rec => rec.code < 200 || rec.code >= 300)
+    //val codePairs = codeFiltered.map(rec => (rec.host, 1))
+    //val hostCounts = hostPairs.reduceByKeyAndWindow((a:Int,b:Int) => (a + b), Seconds(60), Seconds(10))
+    //val codeCounts = codePairs.reduceByKeyAndWindow((a:Int,b:Int) => (a + b), Seconds(60), Seconds(60))
+    //val host1mAvg = hostCounts.map(x => (x._1, x._2 / 60.0))
+    //val host1mWrongCode = codeCounts.filter(x => x._2 >= 2)
 
     host1mAvg.foreachRDD({ (rdd: RDD[(String, Double)], time: Time) =>
       val outputArr = rdd.collect()
@@ -118,9 +151,10 @@ object ServerLogsStreaming {
       }
     })
 
-    val hostActivityNew = logParams.map(rec => (rec.host, System.currentTimeMillis))
-    val hostStateNew = hostActivityNew.updateStateByKey(updateStateNew)
-    val newHosts = hostStateNew.filter(rec => rec._2._2 == true)
+//    val hostActivityNew = logParams.map(rec => (rec.host, System.currentTimeMillis))
+    //    val hostStateNew = hostActivityNew.updateStateByKey(updateStateNew)
+    //    val newHosts = hostStateNew.filter(rec => rec._2._2 == true)
+    val newHosts = createNewHostsStream(logParams)
     newHosts.foreachRDD({ (rdd: RDD[(String, (Long, Boolean))], time: Time) =>
       val outputArr = rdd.collect()
       for (host <- outputArr) {
@@ -129,9 +163,10 @@ object ServerLogsStreaming {
       }
     })
 
-    val hostActivityLost = logParams.map(rec => (rec.host, 1))
-    val hostStateLost = hostActivityLost.updateStateByKey(updateStateLost)
-    val lostHosts = hostStateLost.filter(rec => rec._2 == 0)
+//    val hostActivityLost = logParams.map(rec => (rec.host, 1))
+    //    val hostStateLost = hostActivityLost.updateStateByKey(updateStateLost)
+    //    val lostHosts = hostStateLost.filter(rec => rec._2 == 0)
+    val lostHosts = createLostHostsStream(logParams)
     lostHosts.foreachRDD({ (rdd: RDD[(String, Int)], time: Time) =>
       val outputArr = rdd.collect()
       for (host <- outputArr) {
