@@ -18,7 +18,7 @@ git clone https://github.com/maxteneff/InterviewTest.git
 ```
 #### 2. Build: 
 ```
-cd InterviewTest && sbt package
+sbt package
 ```
 #### 3. Run: 
 ```
@@ -29,7 +29,14 @@ spark-submit --master local[2] interviewtest_2.11-1.0.jar localhost 9999 file:/t
 tail -f output.txt
 ```
 
-## Logs generator:
+## How to test:
+
+#### Run unit-tests:
+```
+sbt test
+```
+
+#### Run logs generator:
 ```
 python logs_gen.py
 ```
