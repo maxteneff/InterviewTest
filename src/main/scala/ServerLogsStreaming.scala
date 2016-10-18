@@ -82,10 +82,10 @@ object ServerLogsStreaming {
     codeCounts.filter(x => x._2 >= 2)
   }
 
-  def createNewHostsStream(logParams: DStream[LogRecord]): DStream[(String, (Long, Boolean))] = {
+  def createNewHostsStream(logParams: DStream[LogRecord]): DStream[(String, Boolean)] = {
     val hostActivityNew = logParams.map(rec => (rec.host, System.currentTimeMillis))
     val hostStateNew = hostActivityNew.updateStateByKey(updateStateNew)
-    hostStateNew.filter(rec => rec._2._2 == true)
+    hostStateNew.filter(rec => rec._2._2 == true).map(rec => (rec._1, rec._2._2))
   }
 
   def createLostHostsStream(logParams: DStream[LogRecord]): DStream[(String, Int)] = {
@@ -123,14 +123,6 @@ object ServerLogsStreaming {
     val host1mAvg = createHost1mAvgStream(logParams)
     val host1mWrongCode = createHost1mWrongCodeStream(logParams)
 
-    //val hostPairs = logParams.map(rec => (rec.host, 1))
-    //val codeFiltered = logParams.filter(rec => rec.code < 200 || rec.code >= 300)
-    //val codePairs = codeFiltered.map(rec => (rec.host, 1))
-    //val hostCounts = hostPairs.reduceByKeyAndWindow((a:Int,b:Int) => (a + b), Seconds(60), Seconds(10))
-    //val codeCounts = codePairs.reduceByKeyAndWindow((a:Int,b:Int) => (a + b), Seconds(60), Seconds(60))
-    //val host1mAvg = hostCounts.map(x => (x._1, x._2 / 60.0))
-    //val host1mWrongCode = codeCounts.filter(x => x._2 >= 2)
-
     host1mAvg.foreachRDD({ (rdd: RDD[(String, Double)], time: Time) =>
       val outputArr = rdd.collect()
       if (outputArr.length > 0) {
@@ -151,11 +143,8 @@ object ServerLogsStreaming {
       }
     })
 
-//    val hostActivityNew = logParams.map(rec => (rec.host, System.currentTimeMillis))
-    //    val hostStateNew = hostActivityNew.updateStateByKey(updateStateNew)
-    //    val newHosts = hostStateNew.filter(rec => rec._2._2 == true)
     val newHosts = createNewHostsStream(logParams)
-    newHosts.foreachRDD({ (rdd: RDD[(String, (Long, Boolean))], time: Time) =>
+    newHosts.foreachRDD({ (rdd: RDD[(String, Boolean)], time: Time) =>
       val outputArr = rdd.collect()
       for (host <- outputArr) {
         val output = createOutputMessage(f"Found new host: ${host._1}. Welcome!")
@@ -163,9 +152,6 @@ object ServerLogsStreaming {
       }
     })
 
-//    val hostActivityLost = logParams.map(rec => (rec.host, 1))
-    //    val hostStateLost = hostActivityLost.updateStateByKey(updateStateLost)
-    //    val lostHosts = hostStateLost.filter(rec => rec._2 == 0)
     val lostHosts = createLostHostsStream(logParams)
     lostHosts.foreachRDD({ (rdd: RDD[(String, Int)], time: Time) =>
       val outputArr = rdd.collect()
